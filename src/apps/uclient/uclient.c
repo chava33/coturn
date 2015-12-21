@@ -602,6 +602,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 	
 	while (1)
 	{	
+		
     fd_web = socket_connect_another("192.168.3.176", 80);
 	bzero(buffer, MAX_STUN_MESSAGE_SIZE);
 	int n = 0;
@@ -616,8 +617,8 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 	
 	bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
 	printf("ready to receive\n");
-	getchar();
-	
+	//getchar();
+	sleep(3);
     client_read_input(&session);
 	printf("received msg--> session.in_buffer.buf=%s\n", &session.in_buffer.buf);
 	if(strstr(session.in_buffer.buf, "HTTP") != NULL) {
