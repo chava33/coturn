@@ -1,0 +1,5 @@
+#!/bin/bash
+#gdb -q -ex run --args ./turnutils_uclient -T -v -n 200 -m 1 -l 180 -y -g $@ 159.203.11.169
+./turnutils_uclient -T -v -n 200 -m 0 -l 48 -y -g $@ 159.203.11.169
+./turnutils_uclient -T -v -n 200 -m 1 -l 48 -y -g $@ 159.203.11.169
+
