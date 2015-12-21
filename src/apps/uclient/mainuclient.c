@@ -50,7 +50,7 @@
 
 /////////////// extern definitions /////////////////////
 
-int clmessage_length=100;  // -l
+int clmessage_length=4096;  // -l
 int do_not_use_channel=0;
 int c2c=1;					// -y
 int clnet_verbose=TURN_VERBOSE_NORMAL;//TURN_VERBOSE_NONE; -v

@@ -626,14 +626,19 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 			error("ERROR writing to socket");
 		bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
 		//b uclient.c:630
-		
+		int count = 0;
 		do {
+			count++;
+			printf("\nIn while loop %d\n",count);
+			sleep(1);
 			rc = recv(fd_web, buffer, sizeof(buffer) - 1,0);
+			
 			printf("read from web server %s", buffer);
 			if ((rc < 0) && (errno == EAGAIN) && sync) {
 				error("ERROR reading from socket");
 				errno = EINTR;
 			}
+			
 		} while (rc < 0 && (errno == EINTR));
 
 		//read(fd_web, buffer, 1024);
