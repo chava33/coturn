@@ -89,7 +89,11 @@ static u64bits max_jitter = 0;
 
 static int show_statistics = 0;
 
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
+
+static int refresh_channel(app_ur_session* elem, u16bits method, uint32_t lt);
+
+//////////////////////// SS ////////////////////////////////////////
 
 static void __turn_getMSTime(void) {
   static u64bits start_sec = 0;
@@ -317,7 +321,7 @@ static int client_shutdown(app_ur_session *elem)
   elem->state=UR_STATE_DONE;
   elem->ctime=current_time;
   uc_delete_session_elem_data(elem);
-  
+
   TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO,"done, connection 0x%lx closed.\n",(long)elem);
   return 0;
 }
@@ -331,7 +335,7 @@ static int client_write(app_ur_session *elem)
   //mi->msgnum = elem->wmsgnum;
   //mi->mstime = current_mstime;
   app_tcp_conn_info *atc=NULL;
-  
+
   memcpy(elem->out_buffer.buf, buffer_to_send, clmessage_length);
   elem->out_buffer.len = clmessage_length;
   //elem->out_buffer.len = snprintf((char *)elem->out_buffer.buf, sizeof(elem->out_buffer.buf), "hello") + 1;
@@ -371,7 +375,7 @@ void client_input_handler(evutil_socket_t fd, short what, void* arg) {
 	if(!elem) {
 		return;
 	}
-	
+
 	switch(elem->state) {
 		case UR_STATE_READY:
 			do {
@@ -433,7 +437,7 @@ static void client_read_input(app_ur_session* elem)
 
 static void set_buffer_to_send(int len, int idx)
 {
-   
+
     char buf[400];
 	printf("enter message to send\n");
 	getchar();
@@ -443,16 +447,16 @@ static void set_buffer_to_send(int len, int idx)
 		//printf("received_chr %s",buf);
 		memcpy(buffer_to_send,buf,sizeof(buf)+1);
 	}
-	
-	
-	
-	
+
+
+
+
 	int n;
 	//memset(buffer_to_send, 0, 16);
-	
+
     //n = snprintf(&buffer_to_send, sizeof(buf), "%s %d",buf, idx);
 	//printf("n %d\n",n);
-	
+
     /*
         buffer_to_send[16] = 'h';
         buffer_to_send[17] = 'e';
@@ -478,7 +482,7 @@ static int get_peer_relay(ioa_addr *relay)
     relay->s4.sin_family = AF_INET;
     relay->s4.sin_port = htons(port);
     inet_pton(AF_INET, addrstr, &relay->s4.sin_addr);
-    
+
     return 0;
 }
 
@@ -498,7 +502,7 @@ void cb_func(evutil_socket_t fd, short what, void *arg)
 int socket_connect_another(char *host, in_port_t port){
 	struct hostent *hp;
 	struct sockaddr_in addr;
-	int on = 1, sock;     
+	int on = 1, sock;
 	//host="localhost";
 	if((hp = gethostbyname(host)) == NULL){
 		herror("gethostbyname");
@@ -506,24 +510,88 @@ int socket_connect_another(char *host, in_port_t port){
 	}
 	const char *addrstr = "159.203.11.169";
 	inet_pton(AF_INET, host, &addr.sin_addr);
-	
+
 	//bcopy(hp->h_addr, &addr.sin_addr, hp->h_length);
 	addr.sin_port = htons(port);
 	addr.sin_family = AF_INET;
 	sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&on, sizeof(int));
-	
+
 	if(sock == -1){
 		perror("setsockopt");
 		exit(1);
 	}
-	
+
 	if(connect(sock, (struct sockaddr *)&addr, sizeof(struct sockaddr_in)) == -1){
-		perror("connect");
+		perror("connect..");
 		exit(1);
 
 	}
 	return sock;
+}
+
+static int refresh_channel(app_ur_session* elem, u16bits method, uint32_t lt)
+{
+
+	stun_buffer message;
+	app_ur_conn_info *clnet_info = &(elem->pinfo);
+
+	if(clnet_info->is_peer)
+		return 0;
+
+	if (!method || (method == STUN_METHOD_REFRESH)) {
+		stun_init_request(STUN_METHOD_REFRESH, &message);
+		lt = htonl(lt);
+		stun_attr_add(&message, STUN_ATTRIBUTE_LIFETIME, (const char*) &lt, 4);
+/*
+		if(dual_allocation && !mobility) {
+			int t = ((u08bits)random())%3;
+			if(t) {
+				u08bits field[4];
+				field[0] = (t==1) ? (u08bits)STUN_ATTRIBUTE_REQUESTED_ADDRESS_FAMILY_VALUE_IPV4 : (u08bits)STUN_ATTRIBUTE_REQUESTED_ADDRESS_FAMILY_VALUE_IPV6;
+				field[1]=0;
+				field[2]=0;
+				field[3]=0;
+				stun_attr_add(&message, STUN_ATTRIBUTE_REQUESTED_ADDRESS_FAMILY, (const char*) field, 4);
+			}
+		}
+*/
+//		add_origin(&message);
+//		if(add_integrity(clnet_info, &message)<0) return -1;
+//		if(use_fingerprints)
+//			    stun_attr_add_fingerprint_str(message.buf, (size_t*) &(message.len));
+		send_buffer(clnet_info, &message, 0,0);
+	}
+/*
+	if (lt && !addr_any(&(elem->pinfo.peer_addr))) {
+
+		if(!no_permissions) {
+			if (!method || (method == STUN_METHOD_CREATE_PERMISSION)) {
+				stun_init_request(STUN_METHOD_CREATE_PERMISSION, &message);
+				stun_attr_add_addr(&message, STUN_ATTRIBUTE_XOR_PEER_ADDRESS, &(elem->pinfo.peer_addr));
+				add_origin(&message);
+				if(add_integrity(clnet_info, &message)<0) return -1;
+				if(use_fingerprints)
+				    stun_attr_add_fingerprint_str(message.buf, (size_t*) &(message.len));
+				send_buffer(&(elem->pinfo), &message, 0,0);
+			}
+		}
+
+		if (!method || (method == STUN_METHOD_CHANNEL_BIND)) {
+			if (STUN_VALID_CHANNEL(elem->chnum)) {
+				stun_set_channel_bind_request(&message, &(elem->pinfo.peer_addr), elem->chnum);
+				add_origin(&message);
+				if(add_integrity(clnet_info, &message)<0) return -1;
+				if(use_fingerprints)
+					    stun_attr_add_fingerprint_str(message.buf, (size_t*) &(message.len));
+				send_buffer(&(elem->pinfo), &message,1,0);
+			}
+		}
+	}
+*/
+	elem->refresh_time = current_mstime + 30*1000;
+
+	return 0;
 }
 
 
@@ -542,13 +610,11 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
         return -1;
     }
 
-
-	
     if (clnet_allocate(clnet_info, &self_relay, default_address_family, NULL, NULL) < 0) {
         return -1;
     }
 
-    if (get_peer_relay(&peer_relay) < 0) { 
+    if (get_peer_relay(&peer_relay) < 0) {
         return -1;
     }
 
@@ -561,28 +627,26 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
     session.tot_msgnum = maxmsgs;
     session.recvmsgnum =- 1;
     session.chnum = 0;
-	
 
-	
     printf("turn_tcp_connect: ready to tcp connect to peer\n");
     //getchar();
     if (turn_tcp_connect(clnet_info, &peer_relay) < 0) {
         return -1;
     }
-//  print elem.pinfo.tcp_conn[0].tcp_data_fd 
+//  print elem.pinfo.tcp_conn[0].tcp_data_fd
 //session->pinfo.tcp_conn[i]->tcp_data_fd = clnet_fd;
     printf("client_read_input: enter when both clients are ready to establish tcp connection\n");
     getchar();
 	//client_read_input-->client_read-->tcp_data_connect-->turn_tcp_connection_bind
     client_read_input(&session);
 	//printf ("clnet_info.tcp_conn.tcp_data_fd----------%d\n",session.pinfo.tcp_conn[0]->tcp_data_fd); // good
-	
-	
 
-	
+
+
+
 	struct event *ev_sen;
 	struct timeval two_seconds = {1,0};
-	struct event_base *base_sen = event_base_new();  
+	struct event_base *base_sen = event_base_new();
 	ev_sen = event_new(base_sen, session.pinfo.tcp_conn[0]->tcp_data_fd, EV_TIMEOUT|EV_READ|EV_PERSIST, client_input_handler,  //client_input_handler
 					(char*)"Reading event");
 	event_add(ev_sen, &two_seconds);
@@ -595,14 +659,14 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 	bzero(buffer, MAX_STUN_MESSAGE_SIZE);
 
 	//printf("host:port  %s:%s\n","192.168.3.176","80");
-	 
+
 	//printf("socket ready---------------\n");
-	
+
 	//Sen Create a realying server
-	
+
 	while (1)
-	{	
-		
+	{
+
     fd_web = socket_connect_another("192.168.3.176", 80);
 	bzero(buffer, MAX_STUN_MESSAGE_SIZE);
 	int n = 0;
@@ -614,7 +678,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
    // printf("client_read_input: enter when both clients are ready to receive data\n");
    // getchar();
 	//
-	
+
 	bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
 	printf("ready to receive\n");
 	//getchar();
@@ -623,7 +687,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 	printf("received msg--> session.in_buffer.buf=%s\n", &session.in_buffer.buf);
 	if(strstr(session.in_buffer.buf, "HTTP") != NULL) {
 		n= write(fd_web, &session.in_buffer.buf, strlen("GET / HTTP/1.1\r\n\r\n"));
-		if (n < 0) 
+		if (n < 0)
 			error("ERROR writing to socket");
 		bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
 		//b uclient.c:630
@@ -633,27 +697,27 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 			printf("\nIn while loop %d\n",count);
 			sleep(1);
 			rc = recv(fd_web, buffer, sizeof(buffer) - 1,0);
-			
+
 			printf("read from web server %s", buffer);
 			if ((rc < 0) && (errno == EAGAIN) && sync) {
 				error("ERROR reading from socket");
 				errno = EINTR;
 			}
-			
+
 		} while (rc < 0 && (errno == EINTR));
 
 		//read(fd_web, buffer, 1024);
 		memcpy(buffer_to_send,buffer,sizeof(buffer)+1);
 		client_write(&session);
 		bzero(buffer, MAX_STUN_MESSAGE_SIZE);
-		
+
 	}
 	 // write(fd, char[]*, len); "GET / HTTP/1.1\r\n\r\n"
 	//write(fd_web, "GET / HTTP/1.1\r\n\r\n", strlen("GET / HTTP/1.1\r\n\r\n")); // working...."GET / HTTP/1.1\r\n\r\n"
-	
+
 	// Bad request version ('HTTP/1.1\\r\\n\\r\\n')
-	//write(fd_web, "GET /\r\n", strlen("GET /\r\n")); // write(fd, char[]*, len);  
-	
+	//write(fd_web, "GET /\r\n", strlen("GET /\r\n")); // write(fd, char[]*, len);
+
 
 	/*
 	// read from web and copy to turn client's out_buffer
@@ -672,9 +736,12 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 	//event_base_dispatch(base_sen);
     //getchar();
 	//run_event(1);
-	
-	shutdown(fd_web, SHUT_RDWR); 
-	close(fd_web); 
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    printf("now: %d-%d-%d %d:%d:%d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    refresh_channel(&session, 0, 6000);
+	shutdown(fd_web, SHUT_RDWR);
+	close(fd_web);
 	}
 
 
@@ -694,8 +761,11 @@ void run_event(int short_burst)
 	}
 
 	event_base_loopexit(base, &timeout);
-    event_base_dispatch(base); 
+    event_base_dispatch(base);
 	//event_base_dispatch(client_event_base);
 }
 
 */
+
+
+

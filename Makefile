@@ -5,7 +5,10 @@ ECHO_CMD = echo
 CC = cc
 LDFLAGS +=  -L/usr/local/lib/ -L/usr/local/lib/ -lrt -lnsl -lresolv -pthread -lcrypto -lssl -levent_core -levent_extra -levent_openssl -levent_pthreads  -Wl,-rpath,/usr/local/lib/ -Wl,-rpath,/usr/local/lib/ -Wl,-rpath,/usr/local/lib
 DBLIBS += 
-CFLAGS += -g  -Wall -Wno-deprecated-declarations -Wextra -Wformat-security -Wnested-externs -Wstrict-prototypes  -Wmissing-prototypes -Wpointer-arith -Wcast-qual -I/usr/local/include -I/usr/local/include/ -I/usr/local/include  -DTURN_HAS_DAEMON       -DINSTALL_PREFIX=/usr/local -DTURNDB=/usr/local/var/db/turndb
+#CFLAGS += -g  -Wall -Wno-deprecated-declarations -Wextra -Wformat-security -Wnested-externs -Wstrict-prototypes  -Wmissing-prototypes -Wpointer-arith -Wcast-qual -I/usr/local/include -I/usr/local/include/ -I/usr/local/include  -DTURN_HAS_DAEMON       -DINSTALL_PREFIX=/usr/local -DTURNDB=/usr/local/var/db/turndb
+CFLAGS += -g  -I/usr/local/include -I/usr/local/include/ -I/usr/local/include  -DTURN_HAS_DAEMON       -DINSTALL_PREFIX=/usr/local -DTURNDB=/usr/local/var/db/turndb
+
+
 CPPFLAGS = 
 DBCFLAGS +=  -DTURN_NO_PQ -DTURN_NO_MYSQL -DTURN_NO_SQLITE -DTURN_NO_MONGO -DTURN_NO_HIREDIS
 #
