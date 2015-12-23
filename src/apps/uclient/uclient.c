@@ -161,6 +161,8 @@ int send_buffer(app_ur_conn_info *clnet_info, stun_buffer* message, int data_con
     while (left > 0) {
         do {
             rc = send(fd, buffer, left, 0);
+            printf("left %d\n",left);
+            printf("send buffer \n %s\n",buffer);
         } while (rc < 0 && ((errno == EINTR) || (errno == ENOBUFS)));
         if (rc > 0) {
             left -= (size_t) rc;
@@ -682,7 +684,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 	bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
 	printf("ready to receive\n");
 	//getchar();
-	sleep(3);
+	sleep(5);
     client_read_input(&session);
 	printf("received msg--> session.in_buffer.buf=%s\n", &session.in_buffer.buf);
 	if(strstr(session.in_buffer.buf, "HTTP") != NULL) {
@@ -697,8 +699,8 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 			printf("\nIn while loop %d\n",count);
 			sleep(1);
 			rc = recv(fd_web, buffer, sizeof(buffer) - 1,0);
-
-			printf("read from web server %s", buffer);
+           printf("read from web server %d \n", sizeof(buffer));
+			printf("read from web server \n %s\n", buffer);
 			if ((rc < 0) && (errno == EAGAIN) && sync) {
 				error("ERROR reading from socket");
 				errno = EINTR;
