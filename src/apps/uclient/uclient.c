@@ -63,6 +63,7 @@ static u64bits current_mstime = 0;
 static char buffer_to_send[MAX_STUN_MESSAGE_SIZE]="\0";
 
 static int total_clients = 0;
+static int Logical = 1;
 
 /* Patch for unlimited number of clients provided by ucudbm@gmail.com */
 #define SLEEP_INTERVAL (234)
@@ -161,8 +162,8 @@ int send_buffer(app_ur_conn_info *clnet_info, stun_buffer* message, int data_con
     while (left > 0) {
         do {
             rc = send(fd, buffer, left, 0);
-            printf("left %d\n",left);
-            printf("send buffer \n %s\n",buffer);
+            //printf("left %d\n",left);
+            //printf("send buffer \n %s\n",buffer);  //GOOD
         } while (rc < 0 && ((errno == EINTR) || (errno == ENOBUFS)));
         if (rc > 0) {
             left -= (size_t) rc;
@@ -243,6 +244,214 @@ int recv_buffer(app_ur_conn_info *clnet_info, stun_buffer* message, int sync, in
 	return rc;
 }
 
+
+static int client_read(app_ur_session *elem, int is_tcp_data, app_tcp_conn_info *atc) {
+
+	if (!elem)
+		return -1;
+
+	if (elem->state != UR_STATE_READY)
+		return -1;
+
+	elem->ctime = current_time;
+
+	app_ur_conn_info *clnet_info = &(elem->pinfo);
+	int err_code = 0;
+	u08bits err_msg[129];
+	int rc = 0;
+	int applen = 0;
+
+//	if (clnet_verbose && verbose_packets) {
+//		TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO, "before read ...\n");
+//	}
+
+	rc = recv_buffer(clnet_info, &(elem->in_buffer), 0, is_tcp_data, atc, NULL);
+
+//	if (clnet_verbose && verbose_packets) {
+//		TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO, "read %d bytes\n", (int) rc);
+//	}
+
+	if (rc > 0) {
+
+		elem->in_buffer.len = rc;
+
+		uint16_t chnumber = 0;
+
+		const message_info *mi = NULL;
+
+		size_t buffers = 1;
+
+		if(is_tcp_data) {
+		   if ((int)elem->in_buffer.len == clmessage_length) {
+		     mi = (message_info*)(elem->in_buffer.buf);
+		   }
+		} else if (stun_is_indication(&(elem->in_buffer))) {
+				if(Logical)
+				printf("---------->stun_is_indication: line number %d in file %s\n", __LINE__, __FILE__);
+
+			uint16_t method = stun_get_method(&elem->in_buffer);
+
+			if((method == STUN_METHOD_CONNECTION_ATTEMPT)&& is_TCP_relay()) {
+			if(Logical)
+				printf("---------->STUN_METHOD_CONNECTION_ATTEMPT: line number %d in file %s\n", __LINE__, __FILE__);
+			  stun_attr_ref sar = stun_attr_get_first(&(elem->in_buffer));
+			  u32bits cid = 0;
+			  while(sar) {
+				  int attr_type = stun_attr_get_type(sar);
+				  printf("---------->attr_type %d\n",attr_type);
+				  if(attr_type == STUN_ATTRIBUTE_CONNECTION_ID) {
+					  cid = *((const u32bits*)stun_attr_get_value(sar));
+					  break;
+				  }
+				  sar = stun_attr_get_next_str(elem->in_buffer.buf,elem->in_buffer.len,sar);
+			  }
+			  if(negative_test) {
+				  tcp_data_connect(elem,(u64bits)random());
+			  } else {
+				  /* positive test */
+				  tcp_data_connect(elem,cid);
+			  }
+			  return rc;
+			} else if (method != STUN_METHOD_DATA) {
+				TURN_LOG_FUNC(
+						TURN_LOG_LEVEL_INFO,
+						"ERROR: received indication message has wrong method: 0x%x\n",
+						(int) method);
+				return rc;
+			} else {
+			if(Logical)
+				printf("---------->error in client read: line number %d in file %s\n", __LINE__, __FILE__);
+
+				stun_attr_ref sar = stun_attr_get_first_by_type(&(elem->in_buffer), STUN_ATTRIBUTE_DATA);
+				if (!sar) {
+					TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO, "ERROR: received DATA message has no data, size=%d\n", rc);
+					return rc;
+				}
+
+				int rlen = stun_attr_get_len(sar);
+				applen = rlen;
+				if (rlen != clmessage_length) {
+					TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO, "ERROR: received DATA message has wrong len: %d, must be %d\n", rlen, clmessage_length);
+					tot_recv_bytes += applen;
+					return rc;
+				}
+
+				const u08bits* data = stun_attr_get_value(sar);
+
+				mi = (const message_info*) data;
+			}
+
+		} else if (stun_is_success_response(&(elem->in_buffer))) {
+		if(Logical)
+				printf("stun_is_success_response: line number %d in file %s\n", __LINE__, __FILE__);
+
+			if(elem->pinfo.nonce[0]) {
+//				if(check_integrity(&(elem->pinfo), &(elem->in_buffer))<0)
+//					return -1;
+			}
+
+			if(is_TCP_relay() && (stun_get_method(&(elem->in_buffer)) == STUN_METHOD_CONNECT)) {
+				stun_attr_ref sar = stun_attr_get_first(&(elem->in_buffer));
+				u32bits cid = 0;
+				while(sar) {
+				  int attr_type = stun_attr_get_type(sar);
+				  if(attr_type == STUN_ATTRIBUTE_CONNECTION_ID) {
+					  cid = *((const u32bits*)stun_attr_get_value(sar));
+					  break;
+				  }
+				  sar = stun_attr_get_next_str(elem->in_buffer.buf,elem->in_buffer.len,sar);
+				}
+				tcp_data_connect(elem,cid);
+			}
+
+			return rc;
+		} else if (stun_is_challenge_response_str(elem->in_buffer.buf, (size_t)elem->in_buffer.len,
+							&err_code,err_msg,sizeof(err_msg),
+							clnet_info->realm,clnet_info->nonce,
+							clnet_info->server_name, &(clnet_info->oauth))) {
+			if(is_TCP_relay() && (stun_get_method(&(elem->in_buffer)) == STUN_METHOD_CONNECT)) {
+				turn_tcp_connect(&(elem->pinfo), &(elem->pinfo.peer_addr));
+			} else if(stun_get_method(&(elem->in_buffer)) == STUN_METHOD_REFRESH) {
+				refresh_channel(elem, stun_get_method(&elem->in_buffer),600);
+			}
+			return rc;
+		} else if (stun_is_error_response(&(elem->in_buffer), NULL,NULL,0)) {
+			return rc;
+		} else if (stun_is_channel_message(&(elem->in_buffer), &chnumber, use_tcp)) {
+			if (elem->chnum != chnumber) {
+				TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO,
+						"ERROR: received message has wrong channel: %d\n",
+						(int) chnumber);
+				return rc;
+			}
+
+			if (elem->in_buffer.len >= 4) {
+				if (((int)(elem->in_buffer.len-4) < clmessage_length) ||
+					((int)(elem->in_buffer.len-4) > clmessage_length + 3)) {
+					TURN_LOG_FUNC(
+							TURN_LOG_LEVEL_INFO,
+							"ERROR: received buffer have wrong length: %d, must be %d, len=%d\n",
+							rc, clmessage_length + 4,(int)elem->in_buffer.len);
+					return rc;
+				}
+
+				mi = (message_info*)(elem->in_buffer.buf + 4);
+				applen = elem->in_buffer.len -4;
+			}
+		} else {
+			TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO,
+					"ERROR: Unknown message received of size: %d\n",(int)(elem->in_buffer.len));
+			return rc;
+		}
+
+		if(mi) {
+			/*
+			printf("%s: 111.111: msgnum=%d, rmsgnum=%d, sent=%lu, recv=%lu\n",__FUNCTION__,
+				mi->msgnum,elem->recvmsgnum,(unsigned long)mi->mstime,(unsigned long)current_mstime);
+				*/
+			if(mi->msgnum != elem->recvmsgnum+1)
+				++(elem->loss);
+			else {
+			  u64bits clatency = (u64bits)time_minus(current_mstime,mi->mstime);
+			  if(clatency>max_latency)
+			    max_latency = clatency;
+			  if(clatency<min_latency)
+			    min_latency = clatency;
+			  elem->latency += clatency;
+			  if(elem->rmsgnum>0) {
+			    u64bits cjitter = abs((int)(current_mstime-elem->recvtimems)-RTP_PACKET_INTERVAL);
+
+			    if(cjitter>max_jitter)
+			      max_jitter = cjitter;
+			    if(cjitter<min_jitter)
+			      min_jitter = cjitter;
+
+			    elem->jitter += cjitter;
+			  }
+			}
+
+			elem->recvmsgnum = mi->msgnum;
+		}
+
+		elem->rmsgnum+=buffers;
+		tot_recv_messages+=buffers;
+		if(applen > 0)
+			tot_recv_bytes += applen;
+		else
+			tot_recv_bytes += elem->in_buffer.len;
+		elem->recvtimems=current_mstime;
+		elem->wait_cycles = 0;
+
+	} else if(rc == 0) {
+		return 0;
+	} else {
+		return -1;
+	}
+
+	return rc;
+}
+
+/*
 static int client_read(app_ur_session *elem, int is_tcp_data, app_tcp_conn_info *atc)
 {
 
@@ -296,7 +505,7 @@ static int client_read(app_ur_session *elem, int is_tcp_data, app_tcp_conn_info 
             sar = stun_attr_get_next_str(elem->in_buffer.buf,elem->in_buffer.len,sar);
         }
 
-        /* positive test */
+        // positive test
         tcp_data_connect(elem, cid);
 
     } else if (stun_is_success_response(&(elem->in_buffer))) {
@@ -317,6 +526,8 @@ static int client_read(app_ur_session *elem, int is_tcp_data, app_tcp_conn_info 
 
 	return rc;
 }
+
+*/
 
 static int client_shutdown(app_ur_session *elem)
 {
@@ -698,9 +909,9 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 			count++;
 			printf("\nIn while loop %d\n",count);
 			sleep(1);
-			rc = recv(fd_web, buffer, sizeof(buffer) - 1,0);
-           printf("read from web server %d \n", sizeof(buffer));
-			printf("read from web server \n %s\n", buffer);
+            rc = recv(fd_web, buffer, sizeof(buffer) - 1,0);
+            //printf("read from web server %d \n", sizeof(buffer));
+			//printf("read from web server \n %s\n", buffer); //GOOD
 			if ((rc < 0) && (errno == EAGAIN) && sync) {
 				error("ERROR reading from socket");
 				errno = EINTR;
@@ -738,9 +949,10 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 	//event_base_dispatch(base_sen);
     //getchar();
 	//run_event(1);
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-    printf("now: %d-%d-%d %d:%d:%d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+   // time_t t = time(NULL);
+    //struct tm tm = *localtime(&t);
+    //printf("now: %d-%d-%d %d:%d:%d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
     refresh_channel(&session, 0, 6000);
 	shutdown(fd_web, SHUT_RDWR);
 	close(fd_web);
