@@ -808,9 +808,28 @@ static int refresh_channel(app_ur_session* elem, u16bits method, uint32_t lt)
 }
 
 
-
-int start_client(const char *rem_addr, int port, const unsigned char *ifname, const char *loc_addr, int maxmsgs, int idx)
+static int write_port_to_file(int src_relay_port, int peer_relay_port)
 {
+
+FILE *f = fopen("/tmp/file.txt", "w+");
+if (f == NULL)
+{
+    printf("Error opening file!\n");
+    exit(1);
+}
+
+fprintf(f, "src_relay_port: %d, remote_relay_port: %d\n", src_relay_port, peer_relay_port);
+fclose(f);
+return(0);
+}
+
+
+
+
+
+int start_client(const char *rem_addr, int port, const unsigned char *ifname, const char *loc_addr, int maxmsgs, int peer_relay_port)
+{
+
     int i;
     app_ur_session session;
     app_ur_conn_info *clnet_info = &session.pinfo;
@@ -827,9 +846,17 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
         return -1;
     }
 
-    if (get_peer_relay(&peer_relay) < 0) {
-        return -1;
-    }
+//    if (get_peer_relay(&peer_relay) < 0) {
+//        return -1;
+//    }
+
+
+    const char *addrstr = "159.203.11.169";
+    peer_relay.s4.sin_family = AF_INET;
+    peer_relay.s4.sin_port = htons(peer_relay_port);
+    inet_pton(AF_INET, addrstr, &peer_relay.s4.sin_addr);
+
+
 
     if (turn_create_permission(clnet_info, &peer_relay, 1) < 0) {
         return -1;
@@ -849,7 +876,11 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 //  print elem.pinfo.tcp_conn[0].tcp_data_fd
 //session->pinfo.tcp_conn[i]->tcp_data_fd = clnet_fd;
     printf("client_read_input: enter when both clients are ready to establish tcp connection\n");
-    getchar();
+    //getchar();
+    int src_relay_port = nswap16(&self_relay.s4.sin_port);
+    write_port_to_file(src_relay_port, peer_relay_port);
+	//write_port_to_file(src_relay_port, peer_relay_port);
+	sleep(20);
 	//client_read_input-->client_read-->tcp_data_connect-->turn_tcp_connection_bind
     client_read_input(&session);
 	//printf ("clnet_info.tcp_conn.tcp_data_fd----------%d\n",session.pinfo.tcp_conn[0]->tcp_data_fd); // good
@@ -925,30 +956,6 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 		bzero(buffer, MAX_STUN_MESSAGE_SIZE);
 
 	}
-	 // write(fd, char[]*, len); "GET / HTTP/1.1\r\n\r\n"
-	//write(fd_web, "GET / HTTP/1.1\r\n\r\n", strlen("GET / HTTP/1.1\r\n\r\n")); // working...."GET / HTTP/1.1\r\n\r\n"
-
-	// Bad request version ('HTTP/1.1\\r\\n\\r\\n')
-	//write(fd_web, "GET /\r\n", strlen("GET /\r\n")); // write(fd, char[]*, len);
-
-
-	/*
-	// read from web and copy to turn client's out_buffer
-	while(read(fd_web, buffer, BUFFER_SIZE_web - 1) != 0){
-		//fprintf(stderr, "%s", buffer);
-		fprintf("\n\n..........buffer.............\n\n %s\n\n",buffer);
-	    memcpy(buffer_to_send,buffer,sizeof(buffer)+1);
-		//memcpy(&session.out_buffer.buf,buffer,sizeof(buffer)+1);
-		fprintf("\n\n...........&session.out_buffer.buf,buffer............\n\n %s\n\n",&session.out_buffer.buf,buffer);
-		client_write(&session);
-		bzero(buffer, BUFFER_SIZE_web);
-	}
-	*/
-
-	//event_base_loopexit(base_sen, &two_seconds);
-	//event_base_dispatch(base_sen);
-    //getchar();
-	//run_event(1);
 
    // time_t t = time(NULL);
     //struct tm tm = *localtime(&t);
@@ -961,25 +968,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 
     return 0;
 }
-/*
-void run_event(int short_burst)
-{
-	struct timeval timeout;
 
-	if(!short_burst) {
-		timeout.tv_sec = 1;
-		timeout.tv_usec = 0;
-	} else {
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 100000;
-	}
-
-	event_base_loopexit(base, &timeout);
-    event_base_dispatch(base);
-	//event_base_dispatch(client_event_base);
-}
-
-*/
 
 
 

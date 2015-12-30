@@ -188,8 +188,8 @@ int main(int argc, char **argv)
 	//client_idx = atoi(optarg); //m
 
 
-	
-	
+
+
 
 	if(dual_allocation) {
 		no_rtcp = 1;
@@ -379,7 +379,24 @@ int main(int argc, char **argv)
 
 	//start_mclient(argv[optind], port, client_ifname, local_addr, messagenumber, mclient);
     //start_client(argv[optind], port, client_ifname, local_addr, messagenumber, client_idx);
-	start_client("159.203.11.169", port, client_ifname, local_addr, messagenumber, client_idx);
+
+    while (1)
+	{
+    int pid, peer_relay_port=0;
+    char buf[10];
+    printf("Enter peer relay port.........:\n");
+    fgets(buf, sizeof(buf), stdin);
+    sscanf(buf, "%i" , &peer_relay_port);
+    pid = fork();
+    if (pid < 0)
+    error("ERROR on fork");
+    if (pid == 0)  {
+       printf("forking\n");
+       start_client("159.203.11.169", port, client_ifname, local_addr, messagenumber, peer_relay_port);
+
+       //exit(0);
+    }
+    }
 
 	return 0;
 }

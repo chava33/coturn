@@ -346,7 +346,7 @@ void tcp_data_connect(app_ur_session *elem, u32bits cid)
 	int clnet_fd;
 
 	clnet_fd = socket(elem->pinfo.remote_addr.ss.sa_family, CLIENT_STREAM_SOCKET_TYPE, CLIENT_STREAM_SOCKET_PROTOCOL);
-	printf("clnet_fd...............%d\n",clnet_fd);
+	//printf("clnet_fd...............%d\n",clnet_fd);
 	if (clnet_fd < 0) {
 		perror("socket");
 		exit(-1);
