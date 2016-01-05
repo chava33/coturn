@@ -162,7 +162,7 @@ int send_buffer(app_ur_conn_info *clnet_info, stun_buffer* message, int data_con
     while (left > 0) {
         do {
             rc = send(fd, buffer, left, 0);
-            //printf("left %d\n",left);
+            //printf("---------rc = send(fd, buffer, left, 0)----------------- %d\n",rc);
             //printf("send buffer \n %s\n",buffer);  //GOOD
         } while (rc < 0 && ((errno == EINTR) || (errno == ENOBUFS)));
         if (rc > 0) {
@@ -178,8 +178,13 @@ int send_buffer(app_ur_conn_info *clnet_info, stun_buffer* message, int data_con
         return -1;
 
     ret = (int) message->len;
+	//printf("------------ret = (int) message->len;------%d\n",ret);
 	return ret;
+
 }
+
+//Upon successful completion, recv() shall return the length of the message in bytes. If no messages are available to be received and
+//the peer has performed an orderly shutdown,ecv() shall return 0. Otherwise, -1 shall be returned and errno set to indicate the error.
 
 int recv_buffer(app_ur_conn_info *clnet_info, stun_buffer* message, int sync, int data_connection, app_tcp_conn_info *atc, stun_buffer* request_message)
 {
@@ -195,8 +200,15 @@ int recv_buffer(app_ur_conn_info *clnet_info, stun_buffer* message, int sync, in
     /* Plain TCP */
     do {
         rc = recv(fd, message->buf, sizeof(message->buf) - 1, MSG_PEEK);
+        //printf("-----------errno--- rc = recv()--------%d\n",errno);
         if ((rc < 0) && (errno == EAGAIN) && sync) {
             errno = EINTR;
+        }
+        if ((errno == 104) ) { // Connection reset by peer error
+           printf("Connection reset by peer errno:%d--------\n",errno);
+           socket_closesocket(clnet_info->fd);  //  need to close fd_web too, data connection closes automatically
+           exit(0);
+
         }
     } while (rc < 0 && (errno == EINTR));
 
@@ -298,7 +310,7 @@ static int client_read(app_ur_session *elem, int is_tcp_data, app_tcp_conn_info 
 			  u32bits cid = 0;
 			  while(sar) {
 				  int attr_type = stun_attr_get_type(sar);
-				  printf("---------->attr_type %d\n",attr_type);
+				 // printf("---------->attr_type %d\n",attr_type);
 				  if(attr_type == STUN_ATTRIBUTE_CONNECTION_ID) {
 					  cid = *((const u32bits*)stun_attr_get_value(sar));
 					  break;
@@ -451,83 +463,6 @@ static int client_read(app_ur_session *elem, int is_tcp_data, app_tcp_conn_info 
 	return rc;
 }
 
-/*
-static int client_read(app_ur_session *elem, int is_tcp_data, app_tcp_conn_info *atc)
-{
-
-	elem->ctime = current_time;
-	app_ur_conn_info *clnet_info = &(elem->pinfo);
-	int rc = 0;
-
-	rc = recv_buffer(clnet_info, &(elem->in_buffer), 0, is_tcp_data, atc, NULL);
-    if (rc <= 0)
-        return rc;
-
-    elem->in_buffer.len = rc;
-    const message_info *mi = NULL;
-    size_t buffers = 1;
-    if (is_tcp_data) {   // If the tcp bind is already there (then only tx and rx, no need to run tcp_data_connect)
-        if ((int)elem->in_buffer.len == clmessage_length) {
-            mi = (message_info*)(elem->in_buffer.buf);
-        }
-        if (mi->msgnum != elem->recvmsgnum + 1) {
-            ++(elem->loss);
-        } else {
-            u64bits clatency = (u64bits)time_minus(current_mstime,mi->mstime);
-            max_latency = MAXIMUM(clatency, max_latency);
-            min_latency = MINIMUM(clatency, min_latency);
-            elem->latency += clatency;
-
-            if (elem->rmsgnum > 0) {
-                u64bits cjitter = abs((int)(current_mstime-elem->recvtimems)-RTP_PACKET_INTERVAL);
-                max_jitter = MAXIMUM(cjitter, max_jitter);
-                min_jitter = MINIMUM(cjitter, min_jitter);
-                elem->jitter += cjitter;
-            }
-        }
-        elem->recvmsgnum = mi->msgnum;
-        elem->rmsgnum += buffers;
-        tot_recv_messages += buffers;
-        tot_recv_bytes += elem->in_buffer.len;
-
-        elem->recvtimems=current_mstime;
-        elem->wait_cycles = 0;
-
-    } else if (stun_is_indication(&(elem->in_buffer))) {
-        stun_attr_ref sar = stun_attr_get_first(&(elem->in_buffer));
-        u32bits cid = 0;
-        while(sar) {
-            int attr_type = stun_attr_get_type(sar);
-            if (attr_type == STUN_ATTRIBUTE_CONNECTION_ID) {
-                cid = *((const u32bits*)stun_attr_get_value(sar));
-                break;
-            }
-            sar = stun_attr_get_next_str(elem->in_buffer.buf,elem->in_buffer.len,sar);
-        }
-
-        // positive test
-        tcp_data_connect(elem, cid);
-
-    } else if (stun_is_success_response(&(elem->in_buffer))) {
-        stun_attr_ref sar = stun_attr_get_first(&(elem->in_buffer));
-        u32bits cid = 0;
-        while (sar) {
-            int attr_type = stun_attr_get_type(sar);
-            if (attr_type == STUN_ATTRIBUTE_CONNECTION_ID) {
-               cid = *((const u32bits*)stun_attr_get_value(sar));
-               break;
-            }
-            sar = stun_attr_get_next_str(elem->in_buffer.buf,elem->in_buffer.len,sar);
-        }
-        tcp_data_connect(elem, cid);
-    } else {
-        TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO, "ERROR: Unknown message received of size: %d\n",(int)(elem->in_buffer.len));
-    }
-
-	return rc;
-}
-
-*/
 
 static int client_shutdown(app_ur_session *elem)
 {
@@ -700,18 +635,6 @@ static int get_peer_relay(ioa_addr *relay)
 }
 
 
-void cb_func(evutil_socket_t fd, short what, void *arg)
-{
-	const char *data = arg;
-	printf("Got an event on socket %d:%s%s%s%s [%s]",
-		   (int) fd,
-		   (what&EV_TIMEOUT) ? " timeout" : "",
-		   (what&EV_READ)    ? " read" : "",
-		   (what&EV_WRITE)   ? " write" : "",
-		   (what&EV_SIGNAL)  ? " signal" : "",
-		   data);
-}
-
 int socket_connect_another(char *host, in_port_t port){
 	struct hostent *hp;
 	struct sockaddr_in addr;
@@ -877,9 +800,10 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 //session->pinfo.tcp_conn[i]->tcp_data_fd = clnet_fd;
     printf("client_read_input: enter when both clients are ready to establish tcp connection\n");
     //getchar();
-    int src_relay_port = nswap16(&self_relay.s4.sin_port);
+    int src_relay_port = nswap16(self_relay.s4.sin_port);
     write_port_to_file(src_relay_port, peer_relay_port);
 	//write_port_to_file(src_relay_port, peer_relay_port);
+	printf("please enter the port in the other client: wiating 20s\n");
 	sleep(20);
 	//client_read_input-->client_read-->tcp_data_connect-->turn_tcp_connection_bind
     client_read_input(&session);
@@ -930,7 +854,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
     client_read_input(&session);
 	printf("received msg--> session.in_buffer.buf=%s\n", &session.in_buffer.buf);
 	if(strstr(session.in_buffer.buf, "HTTP") != NULL) {
-		n= write(fd_web, &session.in_buffer.buf, strlen("GET / HTTP/1.1\r\n\r\n"));
+		n= write(fd_web, &session.in_buffer.buf, strlen(session.in_buffer.buf));
 		if (n < 0)
 			error("ERROR writing to socket");
 		bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
@@ -952,7 +876,8 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 
 		//read(fd_web, buffer, 1024);
 		memcpy(buffer_to_send,buffer,sizeof(buffer)+1);
-		client_write(&session);
+		int return_client_write =client_write(&session);
+		//printf("-------return_client_write---%d\n",return_client_write);
 		bzero(buffer, MAX_STUN_MESSAGE_SIZE);
 
 	}
@@ -960,7 +885,8 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
    // time_t t = time(NULL);
     //struct tm tm = *localtime(&t);
     //printf("now: %d-%d-%d %d:%d:%d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-    refresh_channel(&session, 0, 6000);
+    int return_refresh_channel= refresh_channel(&session, 0, 6000);
+   //printf("-------return_refresh_channel---%d\n",return_refresh_channel);
 	shutdown(fd_web, SHUT_RDWR);
 	close(fd_web);
 	}

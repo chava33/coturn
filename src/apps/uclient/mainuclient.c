@@ -387,6 +387,7 @@ int main(int argc, char **argv)
     printf("Enter peer relay port.........:\n");
     fgets(buf, sizeof(buf), stdin);
     sscanf(buf, "%i" , &peer_relay_port);
+    //start_client("159.203.11.169", port, client_ifname, local_addr, messagenumber, peer_relay_port);
     pid = fork();
     if (pid < 0)
     error("ERROR on fork");

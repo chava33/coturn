@@ -209,63 +209,6 @@ int turn_create_permission(app_ur_conn_info *clnet_info, ioa_addr *peer_addr, in
 	return 0;
 }
 
-int start_c2c_connection
-(
-    uint16_t clnet_remote_port0,
-    const char *remote_address0,
-    const unsigned char* ifname,
-    const char *local_address,
-    app_ur_conn_info *clnet_info_probe,
-    app_ur_conn_info *clnet_info1,
-    uint16_t *chn1,
-    app_ur_conn_info *clnet_info1_rtcp,
-    uint16_t *chn1_rtcp,
-    app_ur_conn_info *clnet_info2,
-    uint16_t *chn2,
-    app_ur_conn_info *clnet_info2_rtcp,
-    uint16_t *chn2_rtcp
-) {
-
-	ioa_addr relay_addr1;
-	ioa_addr relay_addr2;
-
-	uint16_t clnet_remote_port = clnet_remote_port0;
-	char remote_address[1025];
-	STRCPY(remote_address,remote_address0);
-
-	/* Real: */
-    /* hit2 */
-
-	if (clnet_connect(clnet_remote_port, remote_address, ifname, local_address, clnet_info1) < 0) {
-		exit(-1);
-	}
-
-	if (clnet_connect(clnet_remote_port, remote_address, ifname, local_address, clnet_info2) < 0) {
-		exit(-1);
-	}
-
-	if (clnet_allocate(clnet_info1, &relay_addr1, default_address_family, NULL, NULL) < 0) {
-	    exit(-1);
-    }
-
-    if (clnet_allocate(clnet_info2, &relay_addr2, default_address_family, NULL, NULL) < 0) {
-          exit(-1);
-    }
-
-    if (turn_create_permission(clnet_info1, &relay_addr2, 1) < 0) {
-        exit(-1);
-    }
-
-    if (turn_create_permission(clnet_info2, &relay_addr1, 1) < 0) {
-        exit(-1);
-    }
-
-	addr_cpy(&(clnet_info1->peer_addr), &relay_addr2);
-	addr_cpy(&(clnet_info2->peer_addr), &relay_addr1);
-
-	return 0;
-}
-
 //////////// RFC 6062 ///////////////
 
 int turn_tcp_connect(app_ur_conn_info *clnet_info, ioa_addr *peer_addr) {
