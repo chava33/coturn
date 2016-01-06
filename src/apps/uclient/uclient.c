@@ -568,7 +568,7 @@ static void client_read_input(app_ur_session* elem)
             }
         }
         rc = client_read(elem, is_tcp_data, atc);
-        printf("client_read called with is_tcp_data = %d, rc = %d\n", is_tcp_data, rc);
+       // printf("client_read called with is_tcp_data = %d, rc = %d\n", is_tcp_data, rc);
 
         if (rc <= 0)
             break;
@@ -803,57 +803,36 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
     int src_relay_port = nswap16(self_relay.s4.sin_port);
     write_port_to_file(src_relay_port, peer_relay_port);
 	//write_port_to_file(src_relay_port, peer_relay_port);
-	printf("please enter the port in the other client: wiating 20s\n");
-	sleep(20);
+	printf("please enter the port in the other client: wiating 10s\n");
+	sleep(10);
 	//client_read_input-->client_read-->tcp_data_connect-->turn_tcp_connection_bind
     client_read_input(&session);
 	//printf ("clnet_info.tcp_conn.tcp_data_fd----------%d\n",session.pinfo.tcp_conn[0]->tcp_data_fd); // good
-
-
-
-
-	struct event *ev_sen;
-	struct timeval two_seconds = {1,0};
-	struct event_base *base_sen = event_base_new();
-	ev_sen = event_new(base_sen, session.pinfo.tcp_conn[0]->tcp_data_fd, EV_TIMEOUT|EV_READ|EV_PERSIST, client_input_handler,  //client_input_handler
-					(char*)"Reading event");
-	event_add(ev_sen, &two_seconds);
-	//event_add(ev_sen, NULL);
-	//event_base_dispatch(base);
 
 	//Sen Create a realying server
 	int fd_web;
 	char buffer[MAX_STUN_MESSAGE_SIZE];
 	bzero(buffer, MAX_STUN_MESSAGE_SIZE);
 
-	//printf("host:port  %s:%s\n","192.168.3.176","80");
-
-	//printf("socket ready---------------\n");
-
-	//Sen Create a realying server
 
 	while (1)
 	{
 
-    fd_web = socket_connect_another("192.168.3.176", 80);
-	bzero(buffer, MAX_STUN_MESSAGE_SIZE);
+
 	int n = 0;
 	int rc=0;
-	//printf("set_buffer_to_send, client_write: enter when both clients are ready to send data\n");
-    //getchar();
-    //set_buffer_to_send(clmessage_length, idx);
-	//client_write(&session);
-   // printf("client_read_input: enter when both clients are ready to receive data\n");
-   // getchar();
-	//
+
 
 	bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
-	printf("ready to receive\n");
+	//printf("ready to receive\n");
 	//getchar();
-	sleep(5);
+	sleep(2);
     client_read_input(&session);
-	printf("received msg--> session.in_buffer.buf=%s\n", &session.in_buffer.buf);
+
 	if(strstr(session.in_buffer.buf, "HTTP") != NULL) {
+	    printf("received msg--> session.in_buffer.buf=%s\n", &session.in_buffer.buf);
+	    fd_web = socket_connect_another("192.168.3.176", 80);
+	    bzero(buffer, MAX_STUN_MESSAGE_SIZE);
 		n= write(fd_web, &session.in_buffer.buf, strlen(session.in_buffer.buf));
 		if (n < 0)
 			error("ERROR writing to socket");
@@ -879,6 +858,8 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 		int return_client_write =client_write(&session);
 		//printf("-------return_client_write---%d\n",return_client_write);
 		bzero(buffer, MAX_STUN_MESSAGE_SIZE);
+			shutdown(fd_web, SHUT_RDWR);
+	close(fd_web);
 
 	}
 
@@ -887,8 +868,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
     //printf("now: %d-%d-%d %d:%d:%d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
     int return_refresh_channel= refresh_channel(&session, 0, 6000);
    //printf("-------return_refresh_channel---%d\n",return_refresh_channel);
-	shutdown(fd_web, SHUT_RDWR);
-	close(fd_web);
+
 	}
 
 
