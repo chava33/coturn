@@ -809,8 +809,10 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 	sleep(10);
 	//client_read_input-->client_read-->tcp_data_connect-->turn_tcp_connection_bind
 	bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
-	printf("-------0---------\n");
     client_read_input(&session);
+    sleep(2);
+    client_read_input(&session);
+
 	//printf ("clnet_info.tcp_conn.tcp_data_fd----------%d\n",session.pinfo.tcp_conn[0]->tcp_data_fd); // good
 
 	//Sen Create a realying server
@@ -818,7 +820,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 	char buffer[MAX_STUN_MESSAGE_SIZE];
 	bzero(buffer, MAX_STUN_MESSAGE_SIZE);
 
-
+    printf("just before while loop\n");
 	while (1)
 	{
 
@@ -828,11 +830,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 
 
 	bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
-	//printf("ready to receive\n");
-	//getchar();
-
-
-	//sleep(2);
+	printf("just after while loop\n");
     client_read_input(&session);
 
 	if(strstr(session.in_buffer.buf, "HTTP") != NULL) {
@@ -850,8 +848,6 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 			printf("\nIn while loop %d\n",count);
 			sleep(1);
             rc = recv(fd_web, buffer, sizeof(buffer) - 1,0);
-            //printf("read from web server %d \n", sizeof(buffer));
-			//printf("read from web server \n %s\n", buffer); //GOOD
 			if ((rc < 0) && (errno == EAGAIN) && sync) {
 				error("ERROR reading from socket");
 				errno = EINTR;
@@ -859,10 +855,9 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 
 		} while (rc < 0 && (errno == EINTR));
 
-		//read(fd_web, buffer, 1024);
+
 		memcpy(buffer_to_send,buffer,sizeof(buffer)+1);
 		int return_client_write =client_write(&session);
-		//printf("-------return_client_write---%d\n",return_client_write);
 		bzero(buffer, MAX_STUN_MESSAGE_SIZE);
 			shutdown(fd_web, SHUT_RDWR);
 	close(fd_web);
