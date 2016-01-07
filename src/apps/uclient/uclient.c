@@ -188,6 +188,8 @@ int send_buffer(app_ur_conn_info *clnet_info, stun_buffer* message, int data_con
 
 int recv_buffer(app_ur_conn_info *clnet_info, stun_buffer* message, int sync, int data_connection, app_tcp_conn_info *atc, stun_buffer* request_message)
 {
+
+    printf("=============== recv_buffer ===============\n");
 	int rc = 0;
 	stun_tid tid;
 	if(request_message) {
@@ -570,7 +572,7 @@ static void client_read_input(app_ur_session* elem)
         rc = client_read(elem, is_tcp_data, atc);
        // printf("client_read called with is_tcp_data = %d, rc = %d\n", is_tcp_data, rc);
 
-        if (rc <= 0)
+        //if (rc <= 0)
             break;
 
       } while(1);
@@ -803,9 +805,11 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
     int src_relay_port = nswap16(self_relay.s4.sin_port);
     write_port_to_file(src_relay_port, peer_relay_port);
 	//write_port_to_file(src_relay_port, peer_relay_port);
-	printf("please enter the port in the other client: wiating 10s\n");
+	printf("please enter the port in the other client: waiting 10s\n");
 	sleep(10);
 	//client_read_input-->client_read-->tcp_data_connect-->turn_tcp_connection_bind
+	bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
+	printf("-------0---------\n");
     client_read_input(&session);
 	//printf ("clnet_info.tcp_conn.tcp_data_fd----------%d\n",session.pinfo.tcp_conn[0]->tcp_data_fd); // good
 
@@ -826,7 +830,9 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
 	bzero(&session.in_buffer.buf,MAX_STUN_MESSAGE_SIZE);
 	//printf("ready to receive\n");
 	//getchar();
-	sleep(2);
+
+
+	//sleep(2);
     client_read_input(&session);
 
 	if(strstr(session.in_buffer.buf, "HTTP") != NULL) {

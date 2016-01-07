@@ -325,7 +325,7 @@ void tcp_data_connect(app_ur_session *elem, u32bits cid)
         return;
 	}else {
 
-		socket_set_nonblocking(clnet_fd);
+		//socket_set_nonblocking(clnet_fd);
 
 
 
