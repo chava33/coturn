@@ -72,7 +72,7 @@ void run_event(int short_burst);
 #define MAXIMUM(a, b)  ((a) > (b) ? (a) : (b))
 #define MINIMUM(a, b)  ((a) < (b) ? (a) : (b))
 // can use MAX_STUN_MESSAGE_SIZE 65600
-#define BUFFER_SIZE_web (2048)
+#define BUFFER_SIZE_web (1024)  
 int RTP_PACKET_INTERVAL = 20;
 
 static inline s64bits time_minus(u64bits t1, u64bits t2)
@@ -947,7 +947,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
         if(strstr(session.in_buffer.buf, "HTTP") != NULL)
         {
             printf("received msg--> session.in_buffer.buf=%s\n", &session.in_buffer.buf);
-            fd_web = socket_connect_another("127.0.0.1", 80);//192.168.3.176
+            fd_web = socket_connect_another("192.168.3.176", 80);
             bzero(buffer, BUFFER_SIZE_web);
             n= write(fd_web, &session.in_buffer.buf, strlen(session.in_buffer.buf));
             if (n < 0)
@@ -960,7 +960,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
                 printf("\n Reading web server \n");
                 sleep(1); // else partially get the web..
                 rc = recv(fd_web, buffer, sizeof(buffer) - 1,0);
-                //printf("========>received from web buffer=\n %s\n", buffer);
+                printf("========>received from web buffer=\n %s\n", buffer);
                 if ((rc < 0) && (errno == EAGAIN) && sync)
                 {
                     error("ERROR reading from socket");
