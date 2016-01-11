@@ -958,7 +958,7 @@ int start_client(const char *rem_addr, int port, const unsigned char *ifname, co
             do
             {
                 printf("\n Reading web server \n");
-                sleep(1); // else partially get the web..
+                //sleep(1); // in python web server, only partial web is returned. Can be commented for Hiawatha
                 rc = recv(fd_web, buffer, sizeof(buffer) - 1,0);
                 //printf("========>received from web buffer=\n %s\n", buffer);
                 if ((rc < 0) && (errno == EAGAIN) && sync)
